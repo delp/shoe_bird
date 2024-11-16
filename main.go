@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"fmt"
 	"image"
 	"image/color"
 	"io"
@@ -18,6 +19,11 @@ import (
 	"github.com/gopxl/pixel/v2/ext/imdraw"
 	"github.com/pkg/errors"
 	"golang.org/x/image/colornames"
+)
+
+const (
+	jumpDebugIncrement     = 10
+	runspeedDebugIncrement = 10
 )
 
 func loadAnimationSheet(sheetPath, descPath string, frameWidth float64) (sheet pixel.Picture, anims map[string][]pixel.Rect, err error) {
@@ -357,8 +363,26 @@ func run() {
 		if win.Pressed(pixel.KeyRight) {
 			ctrl.X++
 		}
-		if win.JustPressed(pixel.KeyUp) {
+		if win.JustPressed(pixel.KeyUp) || win.JustPressed(pixel.KeySpace) {
 			ctrl.Y = 1
+		}
+		if win.JustPressed(pixel.KeyQ) {
+			fmt.Printf("Q: Jumpspeed %v + %v = %v\n", phys.jumpSpeed, jumpDebugIncrement, phys.jumpSpeed+jumpDebugIncrement)
+			phys.jumpSpeed += jumpDebugIncrement
+		}
+
+		if win.JustPressed(pixel.KeyA) {
+			fmt.Printf("A: Jumpspeed %v - %v = %v\n", phys.jumpSpeed, jumpDebugIncrement, phys.jumpSpeed+jumpDebugIncrement)
+			phys.jumpSpeed -= jumpDebugIncrement
+		}
+
+		if win.JustPressed(pixel.KeyE) {
+			fmt.Printf("E: Runspeed %v + %v = %v\n", phys.runSpeed, runspeedDebugIncrement, phys.runSpeed+runspeedDebugIncrement)
+			phys.runSpeed += runspeedDebugIncrement
+		}
+		if win.JustPressed(pixel.KeyW) {
+			fmt.Printf("W: Runspeed %v - %v = %v\n", phys.runSpeed, runspeedDebugIncrement, phys.runSpeed-runspeedDebugIncrement)
+			phys.runSpeed -= runspeedDebugIncrement
 		}
 
 		// update the physics and animation
@@ -390,5 +414,10 @@ func run() {
 }
 
 func main() {
+	debugInfo :=
+		`debug controls:
+Q: increase jump  E: increase run
+A: decrease jump  W: decrease run`
+	fmt.Printf("%v\n", debugInfo)
 	opengl.Run(run)
 }
