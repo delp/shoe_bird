@@ -328,11 +328,19 @@ func run() {
 		step:   1.0 / 7,
 	}
 
-	canvas := opengl.NewCanvas(pixel.R(-160/2, -120/2, 160/2, 120/2))
+	//canvas := opengl.NewCanvas(pixel.R(-160/2, -120/2, 160/2, 120/2))
+	xmax := (1024.0) / 4
+	xmin := -xmax
+	ymax := (768.0) / 4
+	ymin := -ymax
+	canvas := opengl.NewCanvas(pixel.R(xmin, ymin, xmax, ymax))
 	imd := imdraw.New(sheet)
 	imd.Precision = 32
 
 	camPos := pixel.ZV
+
+	scaleFactor := 6.3
+	otherScaleFactor := 6.3
 
 	last := time.Now()
 	for !win.Closed() {
@@ -351,8 +359,18 @@ func run() {
 
 		// restart the level on pressing enter
 		if win.JustPressed(pixel.KeyEnter) {
-			phys.rect = phys.rect.Moved(phys.rect.Center().Scaled(-1))
+
+			fmt.Printf("gopher bounds: %v\n", phys.rect.Bounds())
+			fmt.Printf("gopher center: %v\n", phys.rect.Center())
+			fmt.Printf("camera vector: %v\n", camPos)
+			returnVector := phys.rect.Center().Scaled(-1)
+			phys.rect = phys.rect.Moved(returnVector)
 			phys.vel = pixel.ZV
+
+			fmt.Println("After move: ")
+			fmt.Printf("gopher bounds: %v\n", phys.rect.Bounds())
+			fmt.Printf("gopher center: %v\n", phys.rect.Center())
+			fmt.Printf("camera vector: %v\n", camPos)
 		}
 
 		// control the gopher with keys
@@ -384,6 +402,29 @@ func run() {
 			fmt.Printf("W: Runspeed %v - %v = %v\n", phys.runSpeed, runspeedDebugIncrement, phys.runSpeed-runspeedDebugIncrement)
 			phys.runSpeed -= runspeedDebugIncrement
 		}
+		if win.JustPressed(pixel.KeyZ) {
+			fmt.Printf("%v\n", phys.rect.Bounds())
+		}
+		if win.JustPressed(pixel.KeyF) {
+			scaleFactor -= .3
+		}
+		if win.JustPressed(pixel.KeyG) {
+			scaleFactor += .3
+		}
+		if win.JustPressed(pixel.KeyV) {
+			otherScaleFactor -= .3
+		}
+		if win.JustPressed(pixel.KeyB) {
+			otherScaleFactor += .3
+		}
+		if win.JustPressed(pixel.KeyEscape) {
+			return
+		}
+		if win.JustPressed(pixel.KeyD) {
+			fmt.Printf("window bounds: %v\n", win.Bounds())
+			fmt.Printf("canvas bounds: %v\n", win.Canvas().Bounds())
+
+		}
 
 		// update the physics and animation
 		phys.update(dt, ctrl, platforms)
@@ -408,7 +449,9 @@ func run() {
 				win.Bounds().H()/canvas.Bounds().H(),
 			),
 		).Moved(win.Bounds().Center()))
-		canvas.Draw(win, pixel.IM.Moved(canvas.Bounds().Center()))
+
+		//canvas.Draw(win, pixel.IM.Moved(canvas.Bounds().Center()))
+		canvas.Draw(win, pixel.IM)
 		win.Update()
 	}
 }
