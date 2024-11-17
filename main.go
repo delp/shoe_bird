@@ -208,9 +208,9 @@ func (ga *gopherAnim) update(dt float64, phys *gopherPhys) {
 	// set the facing direction of the gopher
 	if phys.vel.X != 0 {
 		if phys.vel.X > 0 {
-			ga.dir = +1
-		} else {
 			ga.dir = -1
+		} else {
+			ga.dir = +1
 		}
 	}
 }
@@ -290,9 +290,9 @@ func run() {
 	}
 
 	phys := &gopherPhys{
-		gravity:   -512,
-		runSpeed:  64,
-		jumpSpeed: 192,
+		gravity:   -4000,
+		runSpeed:  3000,
+		jumpSpeed: 5000,
 		rect:      pixel.R(-480, -480, 480, 480),
 	}
 
@@ -317,6 +317,7 @@ func run() {
 		{rect: pixel.R(-150, -67, -140, -65)},
 		{rect: pixel.R(-180, -37, -170, -35)},
 		{rect: pixel.R(-150, -7, -140, -5)},
+		{rect: pixel.R(-300, -2000, 10000, -2200)},
 	}
 	for i := range platforms {
 		platforms[i].color = randomNiceColor()
@@ -329,9 +330,9 @@ func run() {
 	}
 
 	//canvas := opengl.NewCanvas(pixel.R(-160/2, -120/2, 160/2, 120/2))
-	xmax := (1024.0) / 4
+	xmax := (1024.0 * 4)
 	xmin := -xmax
-	ymax := (768.0) / 4
+	ymax := (768.0 * 4)
 	ymin := -ymax
 	canvas := opengl.NewCanvas(pixel.R(xmin, ymin, xmax, ymax))
 	imd := imdraw.New(sheet)
