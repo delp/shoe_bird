@@ -305,18 +305,8 @@ func run() {
 
 	// hardcoded level
 	platforms := []platform{
-		{rect: pixel.R(-50, -34, 50, -32)},
-		{rect: pixel.R(20, 0, 70, 2)},
-		{rect: pixel.R(-100, 10, -50, 12)},
-		{rect: pixel.R(120, -22, 140, -20)},
-		{rect: pixel.R(120, -72, 140, -70)},
-		{rect: pixel.R(120, -122, 140, -120)},
-		{rect: pixel.R(-100, -152, 100, -150)},
-		{rect: pixel.R(-150, -127, -140, -125)},
-		{rect: pixel.R(-180, -97, -170, -95)},
-		{rect: pixel.R(-150, -67, -140, -65)},
-		{rect: pixel.R(-180, -37, -170, -35)},
-		{rect: pixel.R(-150, -7, -140, -5)},
+
+		{rect: pixel.R(10000, -300, 12000, -500)},
 		{rect: pixel.R(-300, -2000, 10000, -2200)},
 	}
 	for i := range platforms {
@@ -433,7 +423,7 @@ func run() {
 		anim.update(dt, phys)
 
 		// draw the scene to the canvas using IMDraw
-		canvas.Clear(colornames.Black)
+		canvas.Clear(colornames.White)
 		imd.Clear()
 		for _, p := range platforms {
 			p.draw(imd)
