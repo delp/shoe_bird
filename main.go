@@ -274,7 +274,7 @@ again:
 func run() {
 	rand.Seed(time.Now().UnixNano())
 
-	sheet, anims, err := loadAnimationSheet("sheet.png", "sheet.csv", 12)
+	sheet, anims, err := loadAnimationSheet("bird_sheet.png", "bird_sheet.csv", 500)
 	if err != nil {
 		panic(err)
 	}
@@ -293,7 +293,7 @@ func run() {
 		gravity:   -512,
 		runSpeed:  64,
 		jumpSpeed: 192,
-		rect:      pixel.R(-6, -7, 6, 7),
+		rect:      pixel.R(-480, -480, 480, 480),
 	}
 
 	anim := &gopherAnim{
