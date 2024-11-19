@@ -97,17 +97,18 @@ func (p *platform) draw(imd *imdraw.IMDraw) {
 	imd.Rectangle(0)
 }
 
-type gopherPhys struct {
+type birdPhys struct {
 	gravity   float64
 	runSpeed  float64
 	jumpSpeed float64
 
 	rect   pixel.Rect
+	hitbox pixel.Rect
 	vel    pixel.Vec
 	ground bool
 }
 
-func (gp *gopherPhys) update(dt float64, ctrl pixel.Vec, platforms []platform) {
+func (gp *birdPhys) update(dt float64, ctrl pixel.Vec, platforms []platform) {
 	// apply controls
 	switch {
 	case ctrl.X < 0:
@@ -157,16 +158,17 @@ type gopherAnim struct {
 	anims map[string][]pixel.Rect
 	rate  float64
 
-	state   animState
-	counter float64
-	dir     float64
+	state       animState
+	counter     float64
+	jumpCounter int
+	dir         float64
 
 	frame pixel.Rect
 
 	sprite *pixel.Sprite
 }
 
-func (ga *gopherAnim) update(dt float64, phys *gopherPhys) {
+func (ga *gopherAnim) update(dt float64, phys *birdPhys) {
 	ga.counter += dt
 
 	// determine the new animation state
@@ -194,28 +196,38 @@ func (ga *gopherAnim) update(dt float64, phys *gopherPhys) {
 		i := int(math.Floor(ga.counter / ga.rate))
 		ga.frame = ga.anims["Run"][i%len(ga.anims["Run"])]
 	case jumping:
-		speed := phys.vel.Y
-		i := int((-speed/phys.jumpSpeed + 1) / 2 * float64(len(ga.anims["Jump"])))
-		if i < 0 {
-			i = 0
+
+		if ga.jumpCounter > 0 {
+			ga.frame = ga.anims["Jump"][0]
+		} else {
+			ga.frame = ga.anims["Jump"][1]
 		}
-		if i >= len(ga.anims["Jump"]) {
-			i = len(ga.anims["Jump"]) - 1
+		// speed := phys.vel.Y
+		// i := int((-speed/phys.jumpSpeed + 1) / 2 * float64(len(ga.anims["Jump"])))
+		// if i < 0 {
+		// 	i = 0
+		// }
+		// if i >= len(ga.anims["Jump"]) {
+		// 	i = len(ga.anims["Jump"]) - 1
+		// }
+		// ga.frame = ga.anims["Jump"][i]
+		ga.jumpCounter--
+		if ga.jumpCounter < 0 {
+			ga.jumpCounter = 0
 		}
-		ga.frame = ga.anims["Jump"][i]
 	}
 
 	// set the facing direction of the gopher
 	if phys.vel.X != 0 {
 		if phys.vel.X > 0 {
-			ga.dir = +1
-		} else {
 			ga.dir = -1
+		} else {
+			ga.dir = +1
 		}
 	}
 }
 
-func (ga *gopherAnim) draw(t pixel.Target, phys *gopherPhys) {
+func (ga *gopherAnim) draw(t pixel.Target, phys *birdPhys) {
 	if ga.sprite == nil {
 		ga.sprite = pixel.NewSprite(nil, pixel.Rect{})
 	}
@@ -272,9 +284,8 @@ again:
 }
 
 func run() {
-	rand.Seed(time.Now().UnixNano())
 
-	sheet, anims, err := loadAnimationSheet("sheet.png", "sheet.csv", 12)
+	sheet, anims, err := loadAnimationSheet("bird_sheet.png", "bird_sheet.csv", 500)
 	if err != nil {
 		panic(err)
 	}
@@ -289,49 +300,49 @@ func run() {
 		panic(err)
 	}
 
-	phys := &gopherPhys{
-		gravity:   -512,
-		runSpeed:  64,
-		jumpSpeed: 192,
-		rect:      pixel.R(-6, -7, 6, 7),
+	phys := &birdPhys{
+		gravity:   -8000,
+		runSpeed:  4500,
+		jumpSpeed: 6000,
+		rect:      pixel.R(-500, -500, 500, 500),
+		hitbox:    pixel.R(-400, -500, 400, 500),
 	}
 
 	anim := &gopherAnim{
 		sheet: sheet,
 		anims: anims,
 		rate:  1.0 / 10,
-		dir:   +1,
+		dir:   -1,
 	}
 
 	// hardcoded level
 	platforms := []platform{
-		{rect: pixel.R(-50, -34, 50, -32)},
-		{rect: pixel.R(20, 0, 70, 2)},
-		{rect: pixel.R(-100, 10, -50, 12)},
-		{rect: pixel.R(120, -22, 140, -20)},
-		{rect: pixel.R(120, -72, 140, -70)},
-		{rect: pixel.R(120, -122, 140, -120)},
-		{rect: pixel.R(-100, -152, 100, -150)},
-		{rect: pixel.R(-150, -127, -140, -125)},
-		{rect: pixel.R(-180, -97, -170, -95)},
-		{rect: pixel.R(-150, -67, -140, -65)},
-		{rect: pixel.R(-180, -37, -170, -35)},
-		{rect: pixel.R(-150, -7, -140, -5)},
+
+		{rect: pixel.R(10000, -300, 12000, -500)},
+
+		{rect: pixel.R(9000, 500, 12000, 400)},
+		// {rect: pixel.R(10000, -300, 12000, -500)},
+		// {rect: pixel.R(10000, -300, 12000, -500)},
+		{rect: pixel.R(-300, -2000, 10000, -2200)},
 	}
+	for i := 0; i < 1000; i++ {
+		platforms = append(platforms, randomPlatform())
+	}
+
 	for i := range platforms {
 		platforms[i].color = randomNiceColor()
 	}
 
 	gol := &goal{
 		pos:    pixel.V(-75, 40),
-		radius: 18,
+		radius: 750,
 		step:   1.0 / 7,
 	}
 
 	//canvas := opengl.NewCanvas(pixel.R(-160/2, -120/2, 160/2, 120/2))
-	xmax := (1024.0) / 4
+	xmax := (1024.0 * 4)
 	xmin := -xmax
-	ymax := (768.0) / 4
+	ymax := (768.0 * 4)
 	ymin := -ymax
 	canvas := opengl.NewCanvas(pixel.R(xmin, ymin, xmax, ymax))
 	imd := imdraw.New(sheet)
@@ -345,6 +356,7 @@ func run() {
 	last := time.Now()
 	for !win.Closed() {
 		dt := time.Since(last).Seconds()
+		fmt.Println(dt)
 		last = time.Now()
 
 		// lerp the camera position towards the gopher
@@ -383,6 +395,7 @@ func run() {
 		}
 		if win.JustPressed(pixel.KeyUp) || win.JustPressed(pixel.KeySpace) {
 			ctrl.Y = 1
+			anim.jumpCounter = 10
 		}
 		if win.JustPressed(pixel.KeyQ) {
 			fmt.Printf("Q: Jumpspeed %v + %v = %v\n", phys.jumpSpeed, jumpDebugIncrement, phys.jumpSpeed+jumpDebugIncrement)
@@ -432,7 +445,7 @@ func run() {
 		anim.update(dt, phys)
 
 		// draw the scene to the canvas using IMDraw
-		canvas.Clear(colornames.Black)
+		canvas.Clear(colornames.White)
 		imd.Clear()
 		for _, p := range platforms {
 			p.draw(imd)
@@ -463,4 +476,13 @@ Q: increase jump  E: increase run
 A: decrease jump  W: decrease run`
 	fmt.Printf("%v\n", debugInfo)
 	opengl.Run(run)
+}
+
+func randomPlatform() platform {
+	x := rand.Intn(100000)
+	y := rand.Intn(100000)
+
+	return platform{
+		rect: pixel.R(float64(x), float64(y), float64(x+1500), float64(y-150)),
+	}
 }
