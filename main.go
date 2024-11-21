@@ -283,12 +283,22 @@ again:
 	return pixel.RGB(r/len, g/len, b/len)
 }
 
-func run() {
-
-	sheet, anims, err := loadAnimationSheet("bird_sheet.png", "bird_sheet.csv", 500)
+func check(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func run() {
+
+	birdSheet, birdAnims, err := loadAnimationSheet("bird_sheet.png", "bird_sheet.csv", 500)
+	check(err)
+
+	noseSheet, noseAnims, err := loadAnimationSheet("nosey.guy.sheet.png", "nosey.guy.sheet.csv", 235)
+	check(err)
+
+	flyguySheet, flyguyAnims, err := loadAnimationSheet("flyguy.sheet.png", "flyguy.sheet.csv", 208)
+	check(err)
 
 	cfg := opengl.WindowConfig{
 		Title:  "Platformer",
@@ -308,11 +318,29 @@ func run() {
 		hitbox:    pixel.R(-400, -500, 400, 500),
 	}
 
+	flyPhys := &birdPhys{}
+
+	nosePhys := &birdPhys{}
+
 	anim := &gopherAnim{
-		sheet: sheet,
-		anims: anims,
+		sheet: birdSheet,
+		anims: birdAnims,
 		rate:  1.0 / 10,
 		dir:   -1,
+	}
+
+	noseAnim := &gopherAnim{
+		sheet: noseSheet,
+		anims: noseAnims,
+		rate:  1.0 / 10,
+		dir:   1,
+	}
+
+	flyAnim := &gopherAnim{
+		sheet: flyguySheet,
+		anims: flyguyAnims,
+		rate:  1.0 / 10,
+		dir:   1,
 	}
 
 	// hardcoded level
@@ -345,7 +373,7 @@ func run() {
 	ymax := (768.0 * 4)
 	ymin := -ymax
 	canvas := opengl.NewCanvas(pixel.R(xmin, ymin, xmax, ymax))
-	imd := imdraw.New(sheet)
+	imd := imdraw.New(birdSheet)
 	imd.Precision = 32
 
 	camPos := pixel.ZV
@@ -443,6 +471,8 @@ func run() {
 		phys.update(dt, ctrl, platforms)
 		gol.update(dt)
 		anim.update(dt, phys)
+		noseAnim.update(dt, nosePhys)
+		flyAnim.update(dt, flyPhys)
 
 		// draw the scene to the canvas using IMDraw
 		canvas.Clear(colornames.White)
@@ -452,6 +482,8 @@ func run() {
 		}
 		gol.draw(imd)
 		anim.draw(imd, phys)
+		noseAnim.draw(imd, nosePhys)
+		flyAnim.draw(imd, flyPhys)
 		imd.Draw(canvas)
 
 		// stretch the canvas to the window
