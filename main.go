@@ -97,7 +97,7 @@ func (p *platform) draw(imd *imdraw.IMDraw) {
 	imd.Rectangle(0)
 }
 
-type birdPhys struct {
+type guyPhys struct {
 	gravity   float64
 	runSpeed  float64
 	jumpSpeed float64
@@ -108,7 +108,7 @@ type birdPhys struct {
 	ground bool
 }
 
-func (gp *birdPhys) update(dt float64, ctrl pixel.Vec, platforms []platform) {
+func (gp *guyPhys) update(dt float64, ctrl pixel.Vec, platforms []platform) {
 	// apply controls
 	switch {
 	case ctrl.X < 0:
@@ -153,7 +153,7 @@ const (
 	jumping
 )
 
-type gopherAnim struct {
+type guyAnim struct {
 	sheet pixel.Picture
 	anims map[string][]pixel.Rect
 	rate  float64
@@ -168,7 +168,7 @@ type gopherAnim struct {
 	sprite *pixel.Sprite
 }
 
-func (ga *gopherAnim) update(dt float64, phys *birdPhys) {
+func (ga *guyAnim) update(dt float64, phys *guyPhys) {
 	ga.counter += dt
 
 	// determine the new animation state
@@ -227,7 +227,7 @@ func (ga *gopherAnim) update(dt float64, phys *birdPhys) {
 	}
 }
 
-func (ga *gopherAnim) draw(t pixel.Target, phys *birdPhys) {
+func (ga *guyAnim) draw(t pixel.Target, phys *guyPhys) {
 	if ga.sprite == nil {
 		ga.sprite = pixel.NewSprite(nil, pixel.Rect{})
 	}
@@ -310,7 +310,7 @@ func run() {
 		panic(err)
 	}
 
-	phys := &birdPhys{
+	shoe_guy_phys := &guyPhys{
 		gravity:   -8000,
 		runSpeed:  4500,
 		jumpSpeed: 6000,
@@ -318,25 +318,29 @@ func run() {
 		hitbox:    pixel.R(-400, -500, 400, 500),
 	}
 
-	flyPhys := &birdPhys{}
+	flyPhys := &guyPhys{
+		rect: pixel.R(-235+800, -235+800, 235+800, 235+800),
+	}
 
-	nosePhys := &birdPhys{}
+	nosePhys := &guyPhys{
+		rect: pixel.R(-235, -235, 235, 235),
+	}
 
-	anim := &gopherAnim{
+	anim := &guyAnim{
 		sheet: birdSheet,
 		anims: birdAnims,
 		rate:  1.0 / 10,
 		dir:   -1,
 	}
 
-	noseAnim := &gopherAnim{
+	noseAnim := &guyAnim{
 		sheet: noseSheet,
 		anims: noseAnims,
 		rate:  1.0 / 10,
 		dir:   1,
 	}
 
-	flyAnim := &gopherAnim{
+	flyAnim := &guyAnim{
 		sheet: flyguySheet,
 		anims: flyguyAnims,
 		rate:  1.0 / 10,
@@ -353,7 +357,7 @@ func run() {
 		// {rect: pixel.R(10000, -300, 12000, -500)},
 		{rect: pixel.R(-300, -2000, 10000, -2200)},
 	}
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 10; i++ {
 		platforms = append(platforms, randomPlatform())
 	}
 
@@ -374,6 +378,8 @@ func run() {
 	ymin := -ymax
 	canvas := opengl.NewCanvas(pixel.R(xmin, ymin, xmax, ymax))
 	imd := imdraw.New(birdSheet)
+	imd_nose := imdraw.New(noseSheet)
+	imd_fly := imdraw.New(flyguySheet)
 	imd.Precision = 32
 
 	camPos := pixel.ZV
@@ -384,14 +390,13 @@ func run() {
 	last := time.Now()
 	for !win.Closed() {
 		dt := time.Since(last).Seconds()
-		fmt.Println(dt)
 		last = time.Now()
 
 		// lerp the camera position towards the gopher
-		camPos = pixel.Lerp(camPos, phys.rect.Center(), 1-math.Pow(1.0/128, dt))
+		camPos = pixel.Lerp(camPos, shoe_guy_phys.rect.Center(), 1-math.Pow(1.0/128, dt))
 		cam := pixel.IM.Moved(camPos.Scaled(-1))
 		canvas.SetMatrix(cam)
-
+		fmt.Printf("min %v max %v\n", nosePhys.rect.Min.X, nosePhys.rect.Min.Y)
 		// slow motion with tab
 		if win.Pressed(pixel.KeyTab) {
 			dt /= 8
@@ -400,17 +405,9 @@ func run() {
 		// restart the level on pressing enter
 		if win.JustPressed(pixel.KeyEnter) {
 
-			fmt.Printf("gopher bounds: %v\n", phys.rect.Bounds())
-			fmt.Printf("gopher center: %v\n", phys.rect.Center())
-			fmt.Printf("camera vector: %v\n", camPos)
-			returnVector := phys.rect.Center().Scaled(-1)
-			phys.rect = phys.rect.Moved(returnVector)
-			phys.vel = pixel.ZV
-
-			fmt.Println("After move: ")
-			fmt.Printf("gopher bounds: %v\n", phys.rect.Bounds())
-			fmt.Printf("gopher center: %v\n", phys.rect.Center())
-			fmt.Printf("camera vector: %v\n", camPos)
+			returnVector := shoe_guy_phys.rect.Center().Scaled(-1)
+			shoe_guy_phys.rect = shoe_guy_phys.rect.Moved(returnVector)
+			shoe_guy_phys.vel = pixel.ZV
 		}
 
 		// control the gopher with keys
@@ -426,25 +423,25 @@ func run() {
 			anim.jumpCounter = 10
 		}
 		if win.JustPressed(pixel.KeyQ) {
-			fmt.Printf("Q: Jumpspeed %v + %v = %v\n", phys.jumpSpeed, jumpDebugIncrement, phys.jumpSpeed+jumpDebugIncrement)
-			phys.jumpSpeed += jumpDebugIncrement
+			fmt.Printf("Q: Jumpspeed %v + %v = %v\n", shoe_guy_phys.jumpSpeed, jumpDebugIncrement, shoe_guy_phys.jumpSpeed+jumpDebugIncrement)
+			shoe_guy_phys.jumpSpeed += jumpDebugIncrement
 		}
 
 		if win.JustPressed(pixel.KeyA) {
-			fmt.Printf("A: Jumpspeed %v - %v = %v\n", phys.jumpSpeed, jumpDebugIncrement, phys.jumpSpeed+jumpDebugIncrement)
-			phys.jumpSpeed -= jumpDebugIncrement
+			fmt.Printf("A: Jumpspeed %v - %v = %v\n", shoe_guy_phys.jumpSpeed, jumpDebugIncrement, shoe_guy_phys.jumpSpeed+jumpDebugIncrement)
+			shoe_guy_phys.jumpSpeed -= jumpDebugIncrement
 		}
 
 		if win.JustPressed(pixel.KeyE) {
-			fmt.Printf("E: Runspeed %v + %v = %v\n", phys.runSpeed, runspeedDebugIncrement, phys.runSpeed+runspeedDebugIncrement)
-			phys.runSpeed += runspeedDebugIncrement
+			fmt.Printf("E: Runspeed %v + %v = %v\n", shoe_guy_phys.runSpeed, runspeedDebugIncrement, shoe_guy_phys.runSpeed+runspeedDebugIncrement)
+			shoe_guy_phys.runSpeed += runspeedDebugIncrement
 		}
 		if win.JustPressed(pixel.KeyW) {
-			fmt.Printf("W: Runspeed %v - %v = %v\n", phys.runSpeed, runspeedDebugIncrement, phys.runSpeed-runspeedDebugIncrement)
-			phys.runSpeed -= runspeedDebugIncrement
+			fmt.Printf("W: Runspeed %v - %v = %v\n", shoe_guy_phys.runSpeed, runspeedDebugIncrement, shoe_guy_phys.runSpeed-runspeedDebugIncrement)
+			shoe_guy_phys.runSpeed -= runspeedDebugIncrement
 		}
 		if win.JustPressed(pixel.KeyZ) {
-			fmt.Printf("%v\n", phys.rect.Bounds())
+			fmt.Printf("%v\n", shoe_guy_phys.rect.Bounds())
 		}
 		if win.JustPressed(pixel.KeyF) {
 			scaleFactor -= .3
@@ -461,6 +458,13 @@ func run() {
 		if win.JustPressed(pixel.KeyEscape) {
 			return
 		}
+		if win.JustPressed(pixel.KeyR) {
+			platforms = []platform{}
+			for i := 0; i < 10; i++ {
+				platforms = append(platforms, randomPlatform())
+			}
+
+		}
 		if win.JustPressed(pixel.KeyD) {
 			fmt.Printf("window bounds: %v\n", win.Bounds())
 			fmt.Printf("canvas bounds: %v\n", win.Canvas().Bounds())
@@ -468,9 +472,9 @@ func run() {
 		}
 
 		// update the physics and animation
-		phys.update(dt, ctrl, platforms)
+		shoe_guy_phys.update(dt, ctrl, platforms)
 		gol.update(dt)
-		anim.update(dt, phys)
+		anim.update(dt, shoe_guy_phys)
 		noseAnim.update(dt, nosePhys)
 		flyAnim.update(dt, flyPhys)
 
@@ -480,11 +484,15 @@ func run() {
 		for _, p := range platforms {
 			p.draw(imd)
 		}
+
 		gol.draw(imd)
-		anim.draw(imd, phys)
-		noseAnim.draw(imd, nosePhys)
-		flyAnim.draw(imd, flyPhys)
+		anim.draw(imd, shoe_guy_phys)
+		noseAnim.draw(imd_nose, nosePhys)
+		flyAnim.draw(imd_fly, flyPhys)
+
 		imd.Draw(canvas)
+		imd_nose.Draw(canvas)
+		imd_fly.Draw(canvas)
 
 		// stretch the canvas to the window
 		win.Clear(colornames.White)
@@ -515,6 +523,7 @@ func randomPlatform() platform {
 	y := rand.Intn(100000)
 
 	return platform{
-		rect: pixel.R(float64(x), float64(y), float64(x+1500), float64(y-150)),
+		rect:  pixel.R(float64(x), float64(y), float64(x+1500), float64(y-150)),
+		color: randomNiceColor(),
 	}
 }
