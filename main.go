@@ -72,13 +72,6 @@ func run() {
 		panic(err)
 	}
 
-	spritesheet, err := loadPicture("trees.png")
-	if err != nil {
-		panic(err)
-	}
-
-	batch := pixel.NewBatch(&pixel.TrianglesData{}, spritesheet)
-
 	bird_sheet, err := loadPicture("bird_sheet.png")
 	if err != nil {
 		panic(err)
@@ -115,6 +108,10 @@ func run() {
 	}
 
 	last := time.Now()
+	i := .001
+	j := .001
+	falling := false
+	widen := true
 	for !win.Closed() {
 		dt := time.Since(last).Seconds()
 		last = time.Now()
@@ -156,18 +153,22 @@ func run() {
 
 		win.Clear(colornames.Forestgreen)
 
-		for i := 0.0; i < 50; i++ {
-			for j := 0.0; j < 50; j++ {
-				// guy_B.sprite.Draw(bird_batch, pixel.IM.Scaled(pixel.ZV, 1).Rotated(pixel.ZV, 0.5*i).Moved(pixel.V(i*500, j*500)))
-				guy_B.sprite.Draw(bird_batch, pixel.IM.ScaledXY(pixel.ZV, pixel.V(1, 2)).Rotated(pixel.ZV, 0.5*i).Moved(pixel.V(i*500, j*500)))
+		// for i := 0.0; i < 50; i++ {
+		// 	for j := 0.0; j < 50; j++ {
+		// 		// guy_B.sprite.Draw(bird_batch, pixel.IM.Scaled(pixel.ZV, 1).Rotated(pixel.ZV, 0.5*i).Moved(pixel.V(i*500, j*500)))
+		// 		guy_B.sprite.Draw(bird_batch, pixel.IM.ScaledXY(pixel.ZV, pixel.V(1, 2)).Rotated(pixel.ZV, 0.5*i).Moved(pixel.V(i*500, j*500)))
+		// 	}
+		// }
+
+		for p := 0.0; p < 10; p++ {
+			for q := 0.0; q < 10; q++ {
+				guy_B.sprite.Draw(bird_batch, pixel.IM.ScaledXY(pixel.ZV, pixel.V(j, i)).Moved(pixel.V(p*500, q*500)))
 			}
 		}
 
-		batch.Draw(win)
 		bird_batch.Draw(win)
 		win.Update()
 
-		batch.Clear()
 		bird_batch.Clear()
 
 		frames++
@@ -176,6 +177,30 @@ func run() {
 			win.SetTitle(fmt.Sprintf("%s | FPS: %d", cfg.Title, frames))
 			frames = 0
 		default:
+		}
+
+		if widen {
+			j += .002
+		} else {
+			j -= .002
+		}
+		if j >= 2 {
+			widen = false
+		}
+		if j <= 0 {
+			widen = true
+		}
+
+		if !falling {
+			i += .003
+		} else {
+			i -= 0.003
+		}
+		if i >= 2 {
+			falling = true
+		}
+		if i <= 0 {
+			falling = false
 		}
 	}
 }
