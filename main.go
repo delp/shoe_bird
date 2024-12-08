@@ -1,3 +1,32 @@
+/*TODO ray: marios max velocity in SMB3 is 4.5 pixels per frame
+    and his sprite width is 8 pixels
+7,0	********
+	********
+	********
+	********
+	********
+	********
+	********
+0,0 ********
+
+
+// Stories
+=======
+[ ] There is a build system that pushes the latest binary to a place ray can grab it
+ * github or my server
+
+[X] There are debug keys that are printed to console that affect physics constants
+=======
+
+so if the bird is 500 px, his max velocity should be 250 px per frame
+
+dimensional analysis
+
+pixels per meter: pixels / m
+frames per second: frames / sec
+pixels per frame: px / frame
+*/
+
 package main
 
 import (
@@ -11,8 +40,33 @@ import (
 
 	"github.com/gopxl/pixel/v2"
 	"github.com/gopxl/pixel/v2/backends/opengl"
+	"github.com/gopxl/pixel/v2/ext/imdraw"
 	"golang.org/x/image/colornames"
 )
+
+var (
+	INITIAL_WINDOW_WIDTH  = 1024.0
+	INITIAL_WINDOW_HEIGHT = 768.0
+	BLOCK_SIZE            = 10
+	JUMP_IMPULSE          = 2800.0
+	GRAVITY               = -9.8 * 500
+	RUN_IMPULSE           = 8000.0
+	STOP_IMPULSE          = 3000.0
+
+	JUMP_INCREMENT    = JUMP_IMPULSE * 0.1
+	GRAVITY_INCREMENT = GRAVITY * 0.1
+	RUN_INCREMENT     = RUN_IMPULSE * 0.1
+	STOP_INCREMENT    = STOP_IMPULSE * 0.1
+)
+
+func printConstants() {
+	fmt.Println("=========================")
+	fmt.Printf("Jump Impulse: %v\n", JUMP_IMPULSE)
+	fmt.Printf("Run Impulse: %v\n", RUN_IMPULSE)
+	fmt.Printf("Stop Impulse: %v\n", STOP_IMPULSE)
+	fmt.Printf("Gravity: %v\n", GRAVITY)
+	fmt.Println("=========================")
+}
 
 func loadPicture(path string) (pixel.Picture, error) {
 	file, err := os.Open(path)
@@ -27,20 +81,65 @@ func loadPicture(path string) (pixel.Picture, error) {
 	return pixel.PictureDataFromImage(img), nil
 }
 
+type entity interface {
+	draw()
+	update(dt float64)
+}
+
+type guy struct {
+	x_pos, y_pos float64
+	dx, dy       float64
+	maxdx, maxdy float64
+	spritesheet  *pixel.Picture
+	sprite       pixel.Sprite
+	batch        *pixel.Batch
+	animations   map[string]pixel.Rect
+	runtimer     float64
+}
+
+func (g *guy) draw() {
+	g.sprite.Draw(g.batch, pixel.IM.Moved(pixel.V(g.x_pos, g.y_pos)))
+}
+
+func (g *guy) update(dt float64) {
+
+	fmt.Println(g.dy)
+	if g.dy == 0 { //		sprite:     *pixel.NewSprite(bird_sheet, birdFrames[1]),
+		g.sprite = *pixel.NewSprite(*g.spritesheet, g.animations["stand"]) // g.animations["stand"]
+	}
+	if g.dy > 0 {
+		g.sprite = *pixel.NewSprite(*g.spritesheet, g.animations["jump1"])
+	}
+	if g.dy < 0 {
+		g.sprite = *pixel.NewSprite(*g.spritesheet, g.animations["jump2"])
+	}
+
+	g.dy += GRAVITY * dt
+
+	//Apply stop inertia
+	if g.dx > 0 {
+		g.dx -= STOP_IMPULSE * dt
+	} else {
+		g.dx += STOP_IMPULSE * dt
+	}
+	g.x_pos += g.dx * dt
+	g.y_pos += g.dy * dt
+
+	if g.dx > g.maxdx {
+		g.dx = g.maxdx
+	}
+	if g.dx < -g.maxdx {
+		g.dx = -g.maxdx
+	}
+	if g.dy > g.maxdy {
+		g.dy = g.maxdy
+	}
+
+}
+
 func run() {
 
 	/*TODO
-
-	okay start parsing all this shit big dog
-	  Loop
-
-	  Load all the sprite sheets and backgrounds
-
-	  Create entity list manually or from a level init file
-
-	  Create level objects like ground platforms items etc
-
-	  Idea: if things get too slow or N squared divide the level into zones that are ignored unless the player is in an active one
 
 	  Loop{
 	    Calculate dt
@@ -56,12 +155,14 @@ func run() {
 	    Check level or game finish state to break loop and load next
 	*/
 
-	INITIAL_WINDOW_WIDTH := 1024.0
-	INITIAL_WINDOW_HEIGHT := 768.0
-	BLOCK_SIZE := 10
+	//The bird is about a meter tall.
+	/*
+		500 px      9.8 meters   4900 px
+		---      *   -----      = ---
+		1 meter       s^2           s^2
+	*/
 
-	fmt.Printf("Booting up with reso: %vx%v, blocksize = %v\n", INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, BLOCK_SIZE)
-
+	//Initialize the window. Note the VSYNC setting
 	cfg := opengl.WindowConfig{
 		Title:  "Bird <shoes>!",
 		Bounds: pixel.R(0, 0, INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT),
@@ -72,6 +173,7 @@ func run() {
 		panic(err)
 	}
 
+	// Load all the sprite sheets and backgrounds
 	bird_sheet, err := loadPicture("bird_sheet.png")
 	if err != nil {
 		panic(err)
@@ -84,10 +186,19 @@ func run() {
 		birdFrames = append(birdFrames, pixel.R(x, 0, x+500, 500))
 	}
 
+	//platform drawer
+	imd := imdraw.New(bird_sheet)
+	imd.Color = colornames.Red
+	a := pixel.V(-2000, -200)
+	b := pixel.V(50000, -100)
+	imd.Push(a, b)
+	imd.Rectangle(0)
+
+	//Camera and framerate stuff
 	var (
 		camPos       = pixel.ZV
-		camSpeed     = 500.0
-		camZoom      = 1.0
+		camSpeed     = 1500.0
+		camZoom      = .2
 		camZoomSpeed = 1.2
 	)
 
@@ -96,27 +207,37 @@ func run() {
 		second = time.Tick(time.Second)
 	)
 
-	type guy struct {
-		x_pos, y_pos float64
-		sprite       pixel.Sprite
+	// TODO Create entity list manually or from a level init file
+
+	var entities []entity
+
+	bird := guy{
+		x_pos:       60,
+		y_pos:       100,
+		maxdx:       4000,
+		maxdy:       6000,
+		spritesheet: &bird_sheet,
+		sprite:      *pixel.NewSprite(bird_sheet, birdFrames[1]),
+		batch:       bird_batch,
+		animations:  make(map[string]pixel.Rect),
+		runtimer:    0.25,
 	}
 
-	guy_B := guy{
-		x_pos:  60,
-		y_pos:  100,
-		sprite: *pixel.NewSprite(bird_sheet, birdFrames[1]),
-	}
+	bird.animations["jump1"] = pixel.R(0, 0, 500, 500)
+	bird.animations["jump2"] = pixel.R(500, 0, 1000, 500)
+	bird.animations["stand"] = pixel.R(1000, 0, 1500, 500)
+	bird.animations["run1"] = pixel.R(1500, 0, 2000, 500)
+	bird.animations["run2"] = pixel.R(2000, 0, 2500, 500)
+
+	entities = append(entities, &bird)
 
 	last := time.Now()
-	i := .001
-	j := .001
-	falling := false
-	widen := true
+
+	// TODO Create level objects like ground platforms items etc
+
 	for !win.Closed() {
 		dt := time.Since(last).Seconds()
 		last = time.Now()
-
-		// batch = pixel.NewBatch(&pixel.TrianglesData{}, spritesheet)
 
 		cam := pixel.IM.Scaled(camPos, camZoom).Moved(win.Bounds().Center().Sub(camPos))
 		win.SetMatrix(cam)
@@ -139,6 +260,28 @@ func run() {
 		if win.Pressed(pixel.KeyUp) {
 			camPos.Y += camSpeed * dt
 		}
+		if win.JustPressed(pixel.KeySpace) {
+			bird.dy = float64(JUMP_IMPULSE)
+		}
+		if win.Pressed(pixel.KeyD) {
+			bird.dx += float64(RUN_IMPULSE) * dt
+		}
+		if win.Pressed(pixel.KeyA) {
+			bird.dx -= float64(RUN_IMPULSE) * dt
+		}
+		if win.JustPressed(pixel.KeyG) {
+			fmt.Printf("Run impulse: %v + 100 = %v\n", RUN_IMPULSE, RUN_IMPULSE+100)
+			RUN_IMPULSE += 100
+		}
+		if win.JustPressed(pixel.KeyF) {
+			fmt.Printf("Run impulse: %v - 100 = %v\n", RUN_IMPULSE, RUN_IMPULSE-100)
+			RUN_IMPULSE -= 100
+		}
+		if win.Pressed(pixel.KeyT) {
+			//Okay, you can just have this "always on" to enable camera tracking, it looks nice, regardless
+			//of if I fully understand it lol
+			camPos = pixel.Lerp(camPos, pixel.V(bird.x_pos, bird.y_pos), 1-math.Pow(1.0/128, dt))
+		}
 		if win.JustPressed(pixel.KeyQ) {
 			camZoom += .1
 		}
@@ -149,28 +292,68 @@ func run() {
 			return
 		}
 
-		camZoom *= math.Pow(camZoomSpeed, win.MouseScroll().Y)
-
-		win.Clear(colornames.Forestgreen)
-
-		// for i := 0.0; i < 50; i++ {
-		// 	for j := 0.0; j < 50; j++ {
-		// 		// guy_B.sprite.Draw(bird_batch, pixel.IM.Scaled(pixel.ZV, 1).Rotated(pixel.ZV, 0.5*i).Moved(pixel.V(i*500, j*500)))
-		// 		guy_B.sprite.Draw(bird_batch, pixel.IM.ScaledXY(pixel.ZV, pixel.V(1, 2)).Rotated(pixel.ZV, 0.5*i).Moved(pixel.V(i*500, j*500)))
-		// 	}
-		// }
-
-		for p := 0.0; p < 10; p++ {
-			for q := 0.0; q < 10; q++ {
-				guy_B.sprite.Draw(bird_batch, pixel.IM.ScaledXY(pixel.ZV, pixel.V(j, i)).Moved(pixel.V(p*500, q*500)))
-			}
+		if win.JustPressed(pixel.KeyU) {
+			JUMP_IMPULSE += JUMP_INCREMENT
+			printConstants()
+		}
+		if win.JustPressed(pixel.KeyJ) {
+			JUMP_IMPULSE -= JUMP_INCREMENT
+			printConstants()
+		}
+		if win.JustPressed(pixel.KeyI) {
+			RUN_IMPULSE += RUN_INCREMENT
+			printConstants()
+		}
+		if win.JustPressed(pixel.KeyK) {
+			RUN_IMPULSE -= RUN_INCREMENT
+			printConstants()
+		}
+		if win.JustPressed(pixel.KeyO) {
+			STOP_IMPULSE += STOP_INCREMENT
+			printConstants()
+		}
+		if win.JustPressed(pixel.KeyL) {
+			STOP_IMPULSE -= STOP_INCREMENT
+			printConstants()
+		}
+		if win.JustPressed(pixel.KeyP) {
+			GRAVITY += GRAVITY_INCREMENT
+			printConstants()
+		}
+		if win.JustPressed(pixel.KeySemicolon) {
+			GRAVITY -= GRAVITY_INCREMENT
+			printConstants()
 		}
 
+		camZoom *= math.Pow(camZoomSpeed, win.MouseScroll().Y)
+
+		//Update all entities && collision detection???
+		for _, item := range entities {
+			item.update(dt)
+		}
+
+		//Draw the background
+		win.Clear(colornames.Forestgreen)
+
+		//Draw all entities
+		for _, item := range entities {
+			item.draw()
+		}
+
+		//Draw the batch to the window and show everything
 		bird_batch.Draw(win)
+		imd.Draw(win)
 		win.Update()
 
+		//Clear the batch
 		bird_batch.Clear()
 
+		if bird.y_pos < 0 {
+			bird.y_pos = 0
+			bird.dy = 0
+		}
+
+		//Framerate calculation stuff
 		frames++
 		select {
 		case <-second:
@@ -178,33 +361,28 @@ func run() {
 			frames = 0
 		default:
 		}
-
-		if widen {
-			j += .002
-		} else {
-			j -= .002
-		}
-		if j >= 2 {
-			widen = false
-		}
-		if j <= 0 {
-			widen = true
-		}
-
-		if !falling {
-			i += .003
-		} else {
-			i -= 0.003
-		}
-		if i >= 2 {
-			falling = true
-		}
-		if i <= 0 {
-			falling = false
-		}
 	}
 }
 
 func main() {
+
+	greeting := ` ____  _   _  ___  _____   ____ ___ ____  ____  
+/ ___|| | | |/ _ \| ____| | __ )_ _|  _ \|  _ \ 
+\___ \| |_| | | | |  _|   |  _ \| || |_) | | | |
+ ___) |  _  | |_| | |___  | |_) | ||  _ <| |_| |
+|____/|_| |_|\___/|_____| |____/___|_| \_\____/                                   
+`
+	s := `
+JUMP_IMPULSE up:   U  STOP_IMPULSE up:   O
+JUMP_IMPULSE down: J  STOP_IMPULSE down: L
+RUN_IMPULSE up:    I  GRAVITY up:        P
+RUN_IMPULSE down:  K  GRAVITY down:      ;
+
+Use the keys to change the movement physics. They will increment by +/- 10% of the initial value.
+
+`
+	fmt.Println(greeting)
+	fmt.Printf("Booting up with reso: %vx%v, blocksize = %v\n", INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, BLOCK_SIZE)
+	fmt.Println(s)
 	opengl.Run(run)
 }
