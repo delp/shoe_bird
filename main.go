@@ -50,13 +50,21 @@ var (
 	BLOCK_SIZE            = 10
 	JUMP_IMPULSE          = 2800.0
 	GRAVITY               = -9.8 * 500
-	RUN_IMPULSE           = 8000.0
-	STOP_IMPULSE          = 3000.0
+	RUN_IMPULSE           = 13600.0
+	STOP_IMPULSE          = 16650.0
+
+	RUN_TIMER = 5
 
 	JUMP_INCREMENT    = JUMP_IMPULSE * 0.1
 	GRAVITY_INCREMENT = GRAVITY * 0.1
 	RUN_INCREMENT     = RUN_IMPULSE * 0.1
 	STOP_INCREMENT    = STOP_IMPULSE * 0.1
+)
+
+const (
+	// List of all mouse buttons.
+	LEFT Direction = iota
+	RIGHT
 )
 
 func printConstants() {
@@ -86,40 +94,68 @@ type entity interface {
 	update(dt float64)
 }
 
+type Direction int
+
 type guy struct {
 	x_pos, y_pos float64
 	dx, dy       float64
 	maxdx, maxdy float64
-	spritesheet  *pixel.Picture
-	sprite       pixel.Sprite
-	batch        *pixel.Batch
-	animations   map[string]pixel.Rect
-	runtimer     float64
-	running      bool
+
+	//Animations and sprites
+	spritesheet *pixel.Picture
+	sprite      pixel.Sprite
+	batch       *pixel.Batch
+	animations  map[string]pixel.Rect
+
+	//Movement State Information
+	runningRight      bool
+	runningLeft       bool
+	topSpeedRight     bool
+	topSpeedLeft      bool
+	TurnaroundToLeft  bool
+	TurnaroundToRight bool
+	Airborne          bool
+	Falling           bool
+
+	direction Direction
 }
 
 func (g *guy) draw() {
-	g.sprite.Draw(g.batch, pixel.IM.Moved(pixel.V(g.x_pos, g.y_pos)))
+	if g.direction == RIGHT {
+		g.sprite.Draw(g.batch, pixel.IM.Moved(pixel.V(g.x_pos, g.y_pos)))
+	} else {
+		g.sprite.Draw(g.batch, pixel.IM.ScaledXY(pixel.ZV, pixel.V(-1, 1)).Moved(pixel.V(g.x_pos, g.y_pos)))
+	}
 }
 
 func (g *guy) update(dt float64) {
 
-	if g.dy == 0 { //		sprite:     *pixel.NewSprite(bird_sheet, birdFrames[1]),
+	if g.dy == 0 {
+		g.Airborne = false
 		g.sprite = *pixel.NewSprite(*g.spritesheet, g.animations["stand"]) // g.animations["stand"]
 	}
-	if g.dy > 0 {
-		g.sprite = *pixel.NewSprite(*g.spritesheet, g.animations["jump1"])
+
+	if g.runningRight || g.runningLeft {
+		g.sprite = *pixel.NewSprite(*g.spritesheet, g.animations["run1"])
 	}
-	if g.dy < 0 {
-		g.sprite = *pixel.NewSprite(*g.spritesheet, g.animations["jump2"])
-	}
+
+	// if g.dy > 0 {
+	// 	g.sprite = *pixel.NewSprite(*g.spritesheet, g.animations["jump1"])
+	// }
+	// if g.dy < 0 {
+	// 	g.sprite = *pixel.NewSprite(*g.spritesheet, g.animations["jump2"])
+	// }
 
 	g.dy += GRAVITY * dt
 
-	//Apply stop inertia only if not running
-	if g.dx > 0 && !g.running {
+	//Apply stop inertia only if not running OR in turnaround state
+	if g.dx > 0 && !g.runningLeft && !g.runningRight {
 		g.dx -= STOP_IMPULSE * dt
-	} else if g.dx <= 0 && !g.running {
+	} else if g.dx <= 0 && !g.runningLeft && !g.runningRight {
+		g.dx += STOP_IMPULSE * dt
+	} else if g.dx > 0 && g.runningLeft && !g.Airborne {
+		g.dx -= STOP_IMPULSE * dt
+	} else if g.dx <= 0 && g.runningRight && !g.Airborne {
 		g.dx += STOP_IMPULSE * dt
 	}
 	g.x_pos += g.dx * dt
@@ -193,7 +229,6 @@ func run() {
 	b := pixel.V(50000, -100)
 	imd.Push(a, b)
 	imd.Rectangle(0)
-
 	//Camera and framerate stuff
 	var (
 		camPos       = pixel.ZV
@@ -220,7 +255,6 @@ func run() {
 		sprite:      *pixel.NewSprite(bird_sheet, birdFrames[1]),
 		batch:       bird_batch,
 		animations:  make(map[string]pixel.Rect),
-		runtimer:    0.25,
 	}
 
 	bird.animations["jump1"] = pixel.R(0, 0, 500, 500)
@@ -242,15 +276,16 @@ func run() {
 		cam := pixel.IM.Scaled(camPos, camZoom).Moved(win.Bounds().Center().Sub(camPos))
 		win.SetMatrix(cam)
 
+		//TODO do you want to do it like this? hack?
+		bird.runningRight = false
+		bird.runningLeft = false
+
 		if win.JustPressed(pixel.MouseButtonLeft) {
 			// tree := pixel.NewSprite(spritesheet, treesFrames[rand.Intn(len(treesFrames))])
 			// mouse := cam.Unproject(win.MousePosition())
 			// fmt.Println(mouse)
 			// tree.Draw(batch, pixel.IM.Scaled(pixel.ZV, 4).Moved(mouse))
 		}
-
-		//TODO hack take this out lol
-		bird.running = false
 
 		if win.Pressed(pixel.KeyLeft) {
 			camPos.X -= camSpeed * dt
@@ -265,15 +300,29 @@ func run() {
 			camPos.Y += camSpeed * dt
 		}
 		if win.JustPressed(pixel.KeySpace) {
+			bird.Airborne = true
 			bird.dy = float64(JUMP_IMPULSE)
 		}
 		if win.Pressed(pixel.KeyD) {
-			bird.dx += float64(RUN_IMPULSE) * dt
-			bird.running = true
+			if !win.Pressed(pixel.KeyA) {
+				bird.dx += float64(RUN_IMPULSE) * dt
+				bird.runningRight = true
+				bird.direction = RIGHT
+			}
 		}
 		if win.Pressed(pixel.KeyA) {
-			bird.running = true
-			bird.dx -= float64(RUN_IMPULSE) * dt
+			if !win.Pressed(pixel.KeyD) {
+				//possible states here
+				//stopped
+				//acel left
+				//acel right
+				//tops right
+				//tops left
+
+				bird.runningLeft = true
+				bird.direction = LEFT
+				bird.dx -= float64(RUN_IMPULSE) * dt
+			}
 		}
 		if win.JustPressed(pixel.KeyG) {
 			fmt.Printf("Run impulse: %v + 100 = %v\n", RUN_IMPULSE, RUN_IMPULSE+100)

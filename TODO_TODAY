@@ -1,5 +1,6 @@
 [ ] put the jump animation back
-[ ] put the running animation back
+[x] put the running animation back
+[ ] put in a running frame sequence timer thing
 [ ] get joystick input working
 [ ] add the egg animation
 [ ] play around with the movement mechanics to make it more fluid
