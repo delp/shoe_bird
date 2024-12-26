@@ -95,6 +95,7 @@ type guy struct {
 	batch        *pixel.Batch
 	animations   map[string]pixel.Rect
 	runtimer     float64
+	running      bool
 }
 
 func (g *guy) draw() {
@@ -103,7 +104,6 @@ func (g *guy) draw() {
 
 func (g *guy) update(dt float64) {
 
-	fmt.Println(g.dy)
 	if g.dy == 0 { //		sprite:     *pixel.NewSprite(bird_sheet, birdFrames[1]),
 		g.sprite = *pixel.NewSprite(*g.spritesheet, g.animations["stand"]) // g.animations["stand"]
 	}
@@ -116,10 +116,10 @@ func (g *guy) update(dt float64) {
 
 	g.dy += GRAVITY * dt
 
-	//Apply stop inertia
-	if g.dx > 0 {
+	//Apply stop inertia only if not running
+	if g.dx > 0 && !g.running {
 		g.dx -= STOP_IMPULSE * dt
-	} else {
+	} else if g.dx <= 0 && !g.running {
 		g.dx += STOP_IMPULSE * dt
 	}
 	g.x_pos += g.dx * dt
@@ -248,6 +248,10 @@ func run() {
 			// fmt.Println(mouse)
 			// tree.Draw(batch, pixel.IM.Scaled(pixel.ZV, 4).Moved(mouse))
 		}
+
+		//TODO hack take this out lol
+		bird.running = false
+
 		if win.Pressed(pixel.KeyLeft) {
 			camPos.X -= camSpeed * dt
 		}
@@ -265,8 +269,10 @@ func run() {
 		}
 		if win.Pressed(pixel.KeyD) {
 			bird.dx += float64(RUN_IMPULSE) * dt
+			bird.running = true
 		}
 		if win.Pressed(pixel.KeyA) {
+			bird.running = true
 			bird.dx -= float64(RUN_IMPULSE) * dt
 		}
 		if win.JustPressed(pixel.KeyG) {
