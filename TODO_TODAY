@@ -1,0 +1,7 @@
+[ ] put the jump animation back
+[ ] put the running animation back
+[ ] get joystick input working
+[ ] add the egg animation
+[ ] play around with the movement mechanics to make it more fluid
+[ ] buffer jump commands for a few frames before the player lands so that they can do good jumps?
+[ ] building a better jump: https://www.youtube.com/watch?v=hG9SzQxaCm8
