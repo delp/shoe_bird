@@ -1,8 +1,12 @@
+[ ] Convert these into features or stories so they aren't as insane and random
+
+
 [ ] jump needs to be not as parabolic (shouldn't be affected by the gravity constant)
 [ ] put the jump animation back
 [ ] put in a running frame sequence timer thing
 [ ] refactor joystick detection and reading stuff to be less ugly n dumb
-[ ] add the egg animation
+[ ] sprite pack the egg animation(s) 
+[ ] add the egg animation(s) to the game
 [ ] play around with the movement mechanics to make it more fluid
 [ ] buffer jump commands for a few frames before the player lands so that they can do good jumps?
 [ ] building a better jump: https://www.youtube.com/watch?v=hG9SzQxaCm8
