@@ -62,7 +62,7 @@ var (
 
 	stick pixel.Joystick
 
-	joystick = false
+	joystickDetected = false
 )
 
 const (
@@ -226,13 +226,8 @@ func run() {
 		birdFrames = append(birdFrames, pixel.R(x, 0, x+500, 500))
 	}
 
-	stickNum := getConnectedJoystick(win)
-	if stickNum == -1 {
-		fmt.Println("No joystick detected")
-	} else {
-		fmt.Println("Joystick detected")
-		joystick = true
-	}
+	var stickNum int
+	stickNum, joystickDetected = getConnectedJoystick(win)
 
 	//platform drawer
 	imd := imdraw.New(bird_sheet)
@@ -311,37 +306,26 @@ func run() {
 		if win.Pressed(pixel.KeyUp) {
 			camPos.Y += camSpeed * dt
 		}
-		if win.JustPressed(pixel.KeySpace) || win.JoystickJustPressed(pixel.Joystick(stickNum), pixel.GamepadCross) {
+		if win.JustPressed(pixel.KeySpace) || checkJoystickJustPressed(win, stickNum, pixel.GamepadCross) {
 			bird.Airborne = true
 			bird.dy = float64(JUMP_IMPULSE)
 		}
-		if win.Pressed(pixel.KeyD) || win.JoystickPressed(pixel.Joystick(stickNum), pixel.GamepadDpadRight) {
-			fmt.Println("riiiight")
-			if !win.Pressed(pixel.KeyA) && !win.JoystickPressed(pixel.Joystick(stickNum), pixel.GamepadDpadLeft) {
-				fmt.Println("fart")
+		if win.Pressed(pixel.KeyD) || checkJoystickPressed(win, stickNum, pixel.GamepadDpadRight) {
+			if !win.Pressed(pixel.KeyA) && !checkJoystickPressed(win, stickNum, pixel.GamepadDpadLeft) {
 				bird.dx += float64(RUN_IMPULSE) * dt
 				bird.runningRight = true
 				bird.direction = RIGHT
 			}
 		}
 
-		if win.Pressed(pixel.KeyA) || win.JoystickPressed(pixel.Joystick(stickNum), pixel.GamepadDpadLeft) {
-			if !win.Pressed(pixel.KeyD) && !win.JoystickPressed(pixel.Joystick(stickNum), pixel.GamepadDpadRight) {
-				//possible states here
-				//stopped
-				//acel left
-				//acel right
-				//tops right
-				//tops left
-
+		if win.Pressed(pixel.KeyA) || checkJoystickPressed(win, stickNum, pixel.GamepadDpadLeft) {
+			if !win.Pressed(pixel.KeyD) && !checkJoystickPressed(win, stickNum, pixel.GamepadDpadRight) {
 				bird.runningLeft = true
 				bird.direction = LEFT
 				bird.dx -= float64(RUN_IMPULSE) * dt
 			}
 		}
-		if win.JustPressed(pixel.KeyComma) {
-			printAllJoystickStates(win)
-		}
+
 		if win.JustPressed(pixel.KeyPeriod) {
 			for i := 0; i <= 15; i++ {
 				if win.JoystickPresent(pixel.Joystick(i)) {
@@ -468,19 +452,30 @@ Use the keys to change the movement physics. They will increment by +/- 10% of t
 	opengl.Run(run)
 }
 
-func printAllJoystickStates(win *opengl.Window) {
-	for i := 0; i <= 15; i++ {
-		fmt.Println(win.JoystickJustPressed(pixel.Joystick(i), pixel.GamepadCross))
-	}
-}
+func getConnectedJoystick(win *opengl.Window) (int, bool) {
 
-func getConnectedJoystick(win *opengl.Window) int {
-
-	for i := 0; i <= pixel.NumJoysticks; i++ {
+	for i := 0; i <= pixel.NumJoysticks-1; i++ {
 		if win.JoystickPresent(pixel.Joystick(i)) {
-			return i
+			return i, true
+
 		}
 	}
 
-	return -1
+	return -1, false
+}
+
+func checkJoystickJustPressed(win *opengl.Window, stickNum int, btn pixel.GamepadButton) bool {
+	if joystickDetected {
+		return win.JoystickJustPressed(pixel.Joystick(stickNum), btn)
+	} else {
+		return false
+	}
+}
+
+func checkJoystickPressed(win *opengl.Window, stickNum int, btn pixel.GamepadButton) bool {
+	if joystickDetected {
+		return win.JoystickPressed(pixel.Joystick(stickNum), btn)
+	} else {
+		return false
+	}
 }
