@@ -51,7 +51,9 @@ var (
 	JUMP_IMPULSE          = 2800.0
 	GRAVITY               = -9.8 * 500
 	RUN_IMPULSE           = 13600.0
-	STOP_IMPULSE          = 16650.0
+	STOP_IMPULSE          = 23310.0
+
+	JUMP_BUFFER = .10
 
 	RUN_TIMER = 5
 
@@ -59,8 +61,6 @@ var (
 	GRAVITY_INCREMENT = GRAVITY * 0.1
 	RUN_INCREMENT     = RUN_IMPULSE * 0.1
 	STOP_INCREMENT    = STOP_IMPULSE * 0.1
-
-	stick pixel.Joystick
 
 	joystickDetected = false
 )
@@ -111,6 +111,9 @@ type guy struct {
 	batch       *pixel.Batch
 	animations  map[string]pixel.Rect
 
+	jumpAnimTimer  float64
+	jumpAnimLength float64
+
 	//Movement State Information
 	runningRight      bool
 	runningLeft       bool
@@ -143,12 +146,14 @@ func (g *guy) update(dt float64) {
 		g.sprite = *pixel.NewSprite(*g.spritesheet, g.animations["run1"])
 	}
 
-	// if g.dy > 0 {
-	// 	g.sprite = *pixel.NewSprite(*g.spritesheet, g.animations["jump1"])
-	// }
-	// if g.dy < 0 {
-	// 	g.sprite = *pixel.NewSprite(*g.spritesheet, g.animations["jump2"])
-	// }
+	if g.Airborne {
+		if g.jumpAnimTimer > 0 {
+			g.jumpAnimTimer -= dt
+			g.sprite = *pixel.NewSprite(*g.spritesheet, g.animations["jump1"])
+		} else {
+			g.sprite = *pixel.NewSprite(*g.spritesheet, g.animations["jump2"])
+		}
+	}
 
 	g.dy += GRAVITY * dt
 
@@ -254,14 +259,16 @@ func run() {
 	var entities []entity
 
 	bird := guy{
-		x_pos:       60,
-		y_pos:       100,
-		maxdx:       4000,
-		maxdy:       6000,
-		spritesheet: &bird_sheet,
-		sprite:      *pixel.NewSprite(bird_sheet, birdFrames[1]),
-		batch:       bird_batch,
-		animations:  make(map[string]pixel.Rect),
+		x_pos:          60,
+		y_pos:          100,
+		maxdx:          4000,
+		maxdy:          6000,
+		spritesheet:    &bird_sheet,
+		sprite:         *pixel.NewSprite(bird_sheet, birdFrames[1]),
+		batch:          bird_batch,
+		animations:     make(map[string]pixel.Rect),
+		jumpAnimTimer:  0,
+		jumpAnimLength: 0.15,
 	}
 
 	bird.animations["jump1"] = pixel.R(0, 0, 500, 500)
@@ -287,13 +294,6 @@ func run() {
 		bird.runningRight = false
 		bird.runningLeft = false
 
-		if win.JustPressed(pixel.MouseButtonLeft) {
-			// tree := pixel.NewSprite(spritesheet, treesFrames[rand.Intn(len(treesFrames))])
-			// mouse := cam.Unproject(win.MousePosition())
-			// fmt.Println(mouse)
-			// tree.Draw(batch, pixel.IM.Scaled(pixel.ZV, 4).Moved(mouse))
-		}
-
 		if win.Pressed(pixel.KeyLeft) {
 			camPos.X -= camSpeed * dt
 		}
@@ -307,8 +307,11 @@ func run() {
 			camPos.Y += camSpeed * dt
 		}
 		if win.JustPressed(pixel.KeySpace) || checkJoystickJustPressed(win, stickNum, pixel.GamepadCross) {
-			bird.Airborne = true
-			bird.dy = float64(JUMP_IMPULSE)
+			if !bird.Airborne {
+				bird.Airborne = true
+				bird.jumpAnimTimer = bird.jumpAnimLength
+				bird.dy = float64(JUMP_IMPULSE)
+			}
 		}
 		if win.Pressed(pixel.KeyD) || checkJoystickPressed(win, stickNum, pixel.GamepadDpadRight) {
 			if !win.Pressed(pixel.KeyA) && !checkJoystickPressed(win, stickNum, pixel.GamepadDpadLeft) {
