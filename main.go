@@ -50,6 +50,8 @@ var (
 	BLOCK_SIZE            = 10
 	JUMP_IMPULSE          = 2800.0
 	GRAVITY               = -9.8 * 500
+	GRAVITY_NORMAL        = -9.8 * 500
+	GRAVITY_FALL          = (-9.89 * 500) * 3
 	RUN_IMPULSE           = 13600.0
 	STOP_IMPULSE          = 23310.0
 
@@ -100,6 +102,13 @@ type entity interface {
 
 type Direction int
 
+type CameraStuff struct {
+	CamPos       pixel.Vec
+	CamSpeed     float64
+	CamZoom      float64
+	CamZoomSpeed float64
+}
+
 type guy struct {
 	x_pos, y_pos float64
 	dx, dy       float64
@@ -136,6 +145,11 @@ func (g *guy) draw() {
 }
 
 func (g *guy) update(dt float64) {
+	if g.dy < 0 {
+		GRAVITY = GRAVITY_FALL
+	} else {
+		GRAVITY = GRAVITY_NORMAL
+	}
 
 	if g.dy == 0 {
 		g.Airborne = false
@@ -242,12 +256,12 @@ func run() {
 	imd.Push(a, b)
 	imd.Rectangle(0)
 	//Camera and framerate stuff
-	var (
-		camPos       = pixel.ZV
-		camSpeed     = 1500.0
-		camZoom      = .2
-		camZoomSpeed = 1.2
-	)
+	cams_stuff := CameraStuff{
+		CamPos:       pixel.ZV,
+		CamSpeed:     1500.0,
+		CamZoom:      .2,
+		CamZoomSpeed: 1.2,
+	}
 
 	var (
 		frames = 0
@@ -294,103 +308,7 @@ func run() {
 		bird.runningRight = false
 		bird.runningLeft = false
 
-		if win.Pressed(pixel.KeyLeft) {
-			camPos.X -= camSpeed * dt
-		}
-		if win.Pressed(pixel.KeyRight) {
-			camPos.X += camSpeed * dt
-		}
-		if win.Pressed(pixel.KeyDown) {
-			camPos.Y -= camSpeed * dt
-		}
-		if win.Pressed(pixel.KeyUp) {
-			camPos.Y += camSpeed * dt
-		}
-		if win.JustPressed(pixel.KeySpace) || checkJoystickJustPressed(win, stickNum, pixel.GamepadCross) {
-			if !bird.Airborne {
-				bird.Airborne = true
-				bird.jumpAnimTimer = bird.jumpAnimLength
-				bird.dy = float64(JUMP_IMPULSE)
-			}
-		}
-		if win.Pressed(pixel.KeyD) || checkJoystickPressed(win, stickNum, pixel.GamepadDpadRight) {
-			if !win.Pressed(pixel.KeyA) && !checkJoystickPressed(win, stickNum, pixel.GamepadDpadLeft) {
-				bird.dx += float64(RUN_IMPULSE) * dt
-				bird.runningRight = true
-				bird.direction = RIGHT
-			}
-		}
-
-		if win.Pressed(pixel.KeyA) || checkJoystickPressed(win, stickNum, pixel.GamepadDpadLeft) {
-			if !win.Pressed(pixel.KeyD) && !checkJoystickPressed(win, stickNum, pixel.GamepadDpadRight) {
-				bird.runningLeft = true
-				bird.direction = LEFT
-				bird.dx -= float64(RUN_IMPULSE) * dt
-			}
-		}
-
-		if win.JustPressed(pixel.KeyPeriod) {
-			for i := 0; i <= 15; i++ {
-				if win.JoystickPresent(pixel.Joystick(i)) {
-					fmt.Println(i)
-				}
-			}
-		}
-		if win.JustPressed(pixel.KeyG) {
-			fmt.Printf("Run impulse: %v + 100 = %v\n", RUN_IMPULSE, RUN_IMPULSE+100)
-			RUN_IMPULSE += 100
-		}
-		if win.JustPressed(pixel.KeyF) {
-			fmt.Printf("Run impulse: %v - 100 = %v\n", RUN_IMPULSE, RUN_IMPULSE-100)
-			RUN_IMPULSE -= 100
-		}
-		if win.Pressed(pixel.KeyT) {
-			//Okay, you can just have this "always on" to enable camera tracking, it looks nice, regardless
-			//of if I fully understand it lol
-			camPos = pixel.Lerp(camPos, pixel.V(bird.x_pos, bird.y_pos), 1-math.Pow(1.0/128, dt))
-		}
-		if win.JustPressed(pixel.KeyQ) {
-			camZoom += .1
-		}
-		if win.JustPressed(pixel.KeyZ) {
-			camZoom -= .1
-		}
-		if win.JustPressed(pixel.KeyEscape) {
-			return
-		}
-
-		if win.JustPressed(pixel.KeyU) {
-			JUMP_IMPULSE += JUMP_INCREMENT
-			printConstants()
-		}
-		if win.JustPressed(pixel.KeyJ) {
-			JUMP_IMPULSE -= JUMP_INCREMENT
-			printConstants()
-		}
-		if win.JustPressed(pixel.KeyI) {
-			RUN_IMPULSE += RUN_INCREMENT
-			printConstants()
-		}
-		if win.JustPressed(pixel.KeyK) {
-			RUN_IMPULSE -= RUN_INCREMENT
-			printConstants()
-		}
-		if win.JustPressed(pixel.KeyO) {
-			STOP_IMPULSE += STOP_INCREMENT
-			printConstants()
-		}
-		if win.JustPressed(pixel.KeyL) {
-			STOP_IMPULSE -= STOP_INCREMENT
-			printConstants()
-		}
-		if win.JustPressed(pixel.KeyP) {
-			GRAVITY += GRAVITY_INCREMENT
-			printConstants()
-		}
-		if win.JustPressed(pixel.KeySemicolon) {
-			GRAVITY -= GRAVITY_INCREMENT
-			printConstants()
-		}
+		handleUserInput(win, &cam, &bird, stickNum)
 
 		camZoom *= math.Pow(camZoomSpeed, win.MouseScroll().Y)
 
@@ -481,4 +399,105 @@ func checkJoystickPressed(win *opengl.Window, stickNum int, btn pixel.GamepadBut
 	} else {
 		return false
 	}
+}
+
+func handleUserInput(win *opengl.Window, cam *pixel.Matrix, bird *guy, stickNum int) {
+	if win.Pressed(pixel.KeyLeft) {
+		camPos.X -= camSpeed * dt
+	}
+	if win.Pressed(pixel.KeyRight) {
+		camPos.X += camSpeed * dt
+	}
+	if win.Pressed(pixel.KeyDown) {
+		camPos.Y -= camSpeed * dt
+	}
+	if win.Pressed(pixel.KeyUp) {
+		camPos.Y += camSpeed * dt
+	}
+	if win.JustPressed(pixel.KeySpace) || checkJoystickJustPressed(win, stickNum, pixel.GamepadCross) {
+		if !bird.Airborne {
+			bird.Airborne = true
+			bird.jumpAnimTimer = bird.jumpAnimLength
+			bird.dy = float64(JUMP_IMPULSE)
+		}
+	}
+	if win.Pressed(pixel.KeyD) || checkJoystickPressed(win, stickNum, pixel.GamepadDpadRight) {
+		if !win.Pressed(pixel.KeyA) && !checkJoystickPressed(win, stickNum, pixel.GamepadDpadLeft) {
+			bird.dx += float64(RUN_IMPULSE) * dt
+			bird.runningRight = true
+			bird.direction = RIGHT
+		}
+	}
+
+	if win.Pressed(pixel.KeyA) || checkJoystickPressed(win, stickNum, pixel.GamepadDpadLeft) {
+		if !win.Pressed(pixel.KeyD) && !checkJoystickPressed(win, stickNum, pixel.GamepadDpadRight) {
+			bird.runningLeft = true
+			bird.direction = LEFT
+			bird.dx -= float64(RUN_IMPULSE) * dt
+		}
+	}
+
+	if win.JustPressed(pixel.KeyPeriod) {
+		for i := 0; i <= 15; i++ {
+			if win.JoystickPresent(pixel.Joystick(i)) {
+				fmt.Println(i)
+			}
+		}
+	}
+	if win.JustPressed(pixel.KeyG) {
+		fmt.Printf("Run impulse: %v + 100 = %v\n", RUN_IMPULSE, RUN_IMPULSE+100)
+		RUN_IMPULSE += 100
+	}
+	if win.JustPressed(pixel.KeyF) {
+		fmt.Printf("Run impulse: %v - 100 = %v\n", RUN_IMPULSE, RUN_IMPULSE-100)
+		RUN_IMPULSE -= 100
+	}
+	if win.Pressed(pixel.KeyT) {
+		//Okay, you can just have this "always on" to enable camera tracking, it looks nice, regardless
+		//of if I fully understand it lol
+		camPos = pixel.Lerp(camPos, pixel.V(bird.x_pos, bird.y_pos), 1-math.Pow(1.0/128, dt))
+	}
+	if win.JustPressed(pixel.KeyQ) {
+		camZoom += .1
+	}
+	if win.JustPressed(pixel.KeyZ) {
+		camZoom -= .1
+	}
+	if win.JustPressed(pixel.KeyEscape) {
+		return
+	}
+
+	if win.JustPressed(pixel.KeyU) {
+		JUMP_IMPULSE += JUMP_INCREMENT
+		printConstants()
+	}
+	if win.JustPressed(pixel.KeyJ) {
+		JUMP_IMPULSE -= JUMP_INCREMENT
+		printConstants()
+	}
+	if win.JustPressed(pixel.KeyI) {
+		RUN_IMPULSE += RUN_INCREMENT
+		printConstants()
+	}
+	if win.JustPressed(pixel.KeyK) {
+		RUN_IMPULSE -= RUN_INCREMENT
+		printConstants()
+	}
+	if win.JustPressed(pixel.KeyO) {
+		STOP_IMPULSE += STOP_INCREMENT
+		printConstants()
+	}
+	if win.JustPressed(pixel.KeyL) {
+		STOP_IMPULSE -= STOP_INCREMENT
+		printConstants()
+	}
+	if win.JustPressed(pixel.KeyP) {
+		GRAVITY += GRAVITY_INCREMENT
+		printConstants()
+	}
+	if win.JustPressed(pixel.KeySemicolon) {
+		GRAVITY -= GRAVITY_INCREMENT
+		printConstants()
+	}
+
 }
